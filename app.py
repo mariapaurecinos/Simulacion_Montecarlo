@@ -126,6 +126,15 @@ def main():
         )
 
     else:  # Usar CSV
+        st.markdown(
+            """
+            ### Formato requerido del CSV
+            
+            - Cada **fila** representa un satélite/panel.  
+            - Cada **columna** representa un experimento/observación.  
+            - Los valores deben ser los **tiempos de falla**.
+            """
+        )
         archivo = st.sidebar.file_uploader("Sube el archivo CSV", type=["csv"])
         if archivo is not None:
             df = pd.read_csv(archivo, header=None)
