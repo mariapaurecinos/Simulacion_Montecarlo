@@ -11,18 +11,6 @@ class SimulacionSateliteMonteCarlo:
         n_satelites_necesarios: int,
         df: pd.DataFrame | None = None
     ):
-        """
-        n_iteraciones:
-            Número de iteraciones de Monte Carlo.
-        n_satelites_totales:
-            En modo aleatorio: número total de satélites.
-            En modo CSV: puedes pasar cualquier cosa, se sobreescribe con df.shape[0].
-        n_satelites_necesarios:
-            Número de satélites/paneles necesarios para que el sistema funcione.
-        df:
-            Si es None => se generan tiempos ~ Uniforme(1000,5000).
-            Si NO es None => df tiene filas = satélites, columnas = observaciones/experimentos.
-        """
         self.df = df
         self.n_iteraciones = int(n_iteraciones)
 
@@ -31,14 +19,12 @@ class SimulacionSateliteMonteCarlo:
             assert n_satelites_totales >= 1
             self.n_satelites_totales = int(n_satelites_totales)
         else:
-            # Modo CSV: el número de satélites lo define el CSV
             self.n_satelites_totales = df.shape[0]
 
         assert 1 <= n_satelites_necesarios <= self.n_satelites_totales
         self.n_satelites_necesarios = int(n_satelites_necesarios)
 
     def _simular_desde_uniforme(self) -> list[float]:
-        """Caso df is None: generar datos aleatorios Uniforme(1000,5000)."""
         outputs = []
         for _ in range(self.n_iteraciones):
             tiempos_falla = np.random.uniform(1000, 5000, self.n_satelites_totales)
@@ -49,14 +35,6 @@ class SimulacionSateliteMonteCarlo:
         return outputs
 
     def _simular_desde_df(self) -> list[float]:
-        """
-        Caso df is not None:
-        - filas = satélites
-        - columnas = observaciones/experimentos para cada satélite
-        - En cada iteración de Monte Carlo:
-          - para cada satélite se elige aleatoriamente una columna (con reemplazo)
-          - se calcula el tiempo de falla del sistema a partir de esos tiempos.
-        """
         data = self.df.to_numpy()              # shape: (n_sats, n_obs)
         n_sats, n_obs = data.shape
         outputs = []
@@ -83,7 +61,7 @@ class SimulacionSateliteMonteCarlo:
         return promedio_tiempofalla, dsv_est
 
 
-# ------------------- STREAMLIT APP -------------------
+# APP
 
 def main():
     st.set_page_config(page_title="Simulación Monte Carlo - Satélites", layout="centered")
@@ -94,10 +72,10 @@ def main():
         Este simulador estima el **tiempo promedio de funcionamiento** de un sistema de satélites/paneles,
         asumiendo que el sistema falla cuando hay menos satélites operativos que los necesarios.
         
-        - Cuando **no subes CSV**, los tiempos de falla se generan como Uniforme(1000, 5000).
-        - Cuando **subes CSV**, se usa directamente la matriz de datos:
-          - Filas = satélites/paneles  
-          - Columnas = observaciones/experimentos  
+        - Los tiempos de falla se generan como Uniforme(1000, 5000).
+        - Para ingresar tus datos debe ser un CSV, donde no tengas encabezados y:
+          - Filas = satélites  
+          - Columnas = observaciones
         """
     )
 
@@ -106,7 +84,7 @@ def main():
     # Modo de datos
     modo_datos = st.sidebar.radio(
         "Fuente de datos",
-        ("Generar aleatorio (Uniforme[1000,5000])", "Usar CSV (filas = satélites, columnas = observaciones)")
+        ("Generar aleatorio", "Usar CSV")
     )
 
     df = None
@@ -114,7 +92,7 @@ def main():
     n_satelites_totales = None
     n_satelites_necesarios = None
 
-    if modo_datos == "Generar aleatorio (Uniforme[1000,5000])":
+    if modo_datos == "Generar aleatorio":
         # Aquí sí se usan los tres parámetros
         n_satelites_totales = st.sidebar.number_input(
             "Número total de satélites/paneles",
@@ -142,13 +120,6 @@ def main():
 
     else:  # Usar CSV
         st.markdown(
-            """
-            ### Formato requerido del CSV
-            
-            - Cada **fila** representa un satélite/panel.  
-            - Cada **columna** representa un experimento/observación.  
-            - Los valores deben ser los **tiempos de falla**.
-            """
         )
         archivo = st.sidebar.file_uploader("Sube el archivo CSV", type=["csv"])
         if archivo is not None:
@@ -170,10 +141,13 @@ def main():
                 value=1000,
                 step=1
             )
-
-            # Para este problema concreto asumimos que el sistema necesita al menos 2 paneles operativos.
-            n_satelites_necesarios = 2
-            st.sidebar.write(f"Para el modo CSV se asume: satélites necesarios = {n_satelites_necesarios}")
+            n_satelites_necesarios = st.sidebar.number_input(
+                "Número de satelites necesarios para que el sistema funcione",
+                min_value=1,
+                max_value=1000000,
+                value=1000,
+                step=1
+            )
         else:
             st.sidebar.info("Sube un CSV para usar esta opción.")
 
