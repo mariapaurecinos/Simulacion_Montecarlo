@@ -2,7 +2,78 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-# Pega aquí la clase SimulacionSateliteMonteCarlo
+class SimulacionSateliteMonteCarlo:
+    def __init__(self, n_iteraciones: int, n_satelites_totales: int, n_satelites_necesarios: int, df: pd.DataFrame = None):
+        """
+        n_iteraciones: número de corridas de Monte Carlo (solo se usa cuando df es None).
+        n_satelites_totales: número total de satélites/paneles (solo se usa cuando df es None).
+        n_satelites_necesarios: cuántos satélites/paneles deben estar operativos para que el sistema funcione.
+        df: opcional, matriz de datos donde filas = satélites y columnas = experimentos.
+        """
+        self.df = df
+
+        if df is None:
+            # Modo aleatorio: el total lo da el usuario
+            if n_satelites_totales < 1:
+                raise ValueError("Debe haber al menos 1 satélite.")
+            self.n_satelites_totales = int(n_satelites_totales)
+            self.n_iteraciones = int(n_iteraciones)
+        else:
+            # Modo CSV: el total lo define el número de filas del archivo
+            self.n_satelites_totales = df.shape[0]
+            # n_iteraciones en este modo es el número de columnas (experimentos)
+            self.n_iteraciones = df.shape[1]
+
+        if not (1 <= n_satelites_necesarios <= self.n_satelites_totales):
+            raise ValueError(
+                f"Los satélites necesarios ({n_satelites_necesarios}) deben estar entre 1 y {self.n_satelites_totales}."
+            )
+
+        self.n_satelites_necesarios = int(n_satelites_necesarios)
+
+    def _simular_desde_uniforme(self) -> list[float]:
+        """Caso df is None: generar datos aleatorios Uniforme(1000,5000)."""
+        outputs = []
+        for _ in range(self.n_iteraciones):
+            # tiempos de falla para cada satélite/panel
+            tiempos_falla = np.random.uniform(1000, 5000, self.n_satelites_totales)
+            # ordenar de mayor a menor
+            tiempos_falla = np.sort(tiempos_falla)[::-1]
+            # índice del satélite que define la falla del sistema
+            idx = self.n_satelites_necesarios - 1
+            tiempo_expected_simulacion = tiempos_falla[idx]
+            outputs.append(tiempo_expected_simulacion)
+        return outputs
+
+    def _simular_desde_df(self) -> list[float]:
+        """
+        Caso df is not None: cada columna es un experimento, cada fila un satélite.
+        """
+        outputs = []
+        for i in range(self.df.shape[1]):  # columnas = experimentos
+            tiempos_falla = self.df.iloc[:, i].values
+            tiempos_falla = np.sort(tiempos_falla)[::-1]
+            idx = self.n_satelites_necesarios - 1
+            tiempo_expected_simulacion = tiempos_falla[idx]
+            outputs.append(tiempo_expected_simulacion)
+        return outputs
+
+    def ejecutar(self):
+        """
+        Ejecuta la simulación y devuelve:
+        - promedio del tiempo de falla
+        - desviación estándar del tiempo de falla
+        - lista de tiempos de falla (uno por experimento)
+        """
+        if self.df is None:
+            outputs = self._simular_desde_uniforme()
+        else:
+            outputs = self._simular_desde_df()
+
+        promedio_tiempofalla = round(float(np.mean(outputs)), 2)
+        dsv_est = round(float(np.std(outputs)), 2)
+        return promedio_tiempofalla, dsv_est, outputs
+    
 from simulador_satelites import SimulacionSateliteMonteCarlo  # o pega la clase directamente arriba
 
 
